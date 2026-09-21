@@ -18,6 +18,8 @@ from pathlib import Path
 
 from .layouts import LAYOUTS, get_layout, compose
 from .shapes import ranked_shapes
+
+__version__ = "0.1.0"
 from .palette import (
     STYLES,
     THEME_PRESETS,
@@ -178,6 +180,8 @@ description="Генератор обоев в стиле Material You (M3).\n"
     p.add_argument("-help", action="help", help=_SUPPRESS)  # alias для -h/--help
     p.add_argument("--advanced", action="store_true",
                    help="показать полную справку (все флаги)")
+    p.add_argument("--version", action="version",
+                   version=f"wallgen {__version__}")
     return p
 
 

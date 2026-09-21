@@ -4,6 +4,32 @@
 
 Просто запусти без флагов — и получишь случайные обои.
 
+## Установка
+
+**Через pip** (требуется Python ≥ 3.10, pycairo, Pillow, numpy, lxml):
+
+```bash
+git clone https://github.com/Minish777/wallgen-remastered.git
+cd wallgen-remastered
+pip install -e . --break-system-packages   # системная установка
+# или в виртуальном окружении:
+python3 -m venv .venv && . .venv/bin/activate && pip install -e .
+```
+
+**Автоматический установщик** (создаёт venv):
+
+```bash
+./install.sh
+```
+
+**Без установки** (через встроенный лаунчер):
+
+```bash
+./bin/wallgen
+```
+
+После установки доступна команда `wallgen` из любого места.
+
 ## Быстрый старт
 
 ```bash
@@ -30,6 +56,7 @@ wallgen -L auto -fp 1080x2400
 
 - `wallgen --help` — основные флаги
 - `wallgen --advanced` — полная справка
+- `wallgen --version` — версия
 - `wallgen --list-themes`, `--list-styles`, `--list-layouts`, `--list-shapes`
 
 ## Новое
@@ -38,6 +65,15 @@ wallgen -L auto -fp 1080x2400
 - **Ранжирование по объёму** — `ranked_shapes()` сортирует все фигуры по занимаемой площади; компоновщик `compose()` собирает иерархичную композицию (доминанта → средняя → акценты), чтобы она всегда выглядела сбалансированно.
 - **Авто-раскладка** `-L auto` — собирает композицию из ranked-шейпов.
 - **Телефон** `-fp WxH` — вертикальная раскладка с `rotate=0` (буквы прямо).
+
+## Разработка
+
+```bash
+make install   # установить
+make lint      # проверить синтаксис
+make version   # версия
+make clean     # убрать .venv и кэш
+```
 
 ## Лицензия
 
