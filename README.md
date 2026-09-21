@@ -33,8 +33,10 @@ python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 ## Примеры
 
 <p align="center">
-  <img src="examples/tall.jpg" width="300"> &nbsp;&nbsp;
-  <img src="examples/landscape.jpg" width="300">
+  <img src="examples/tall.jpg" height="240"><br>
+  <em>телефон 1080×2400</em><br><br>
+  <img src="examples/landscape.jpg" height="240"><br>
+  <em>ПК 3840×2160</em>
 </p>
 
 | Раскладка | Формат | Описание |
