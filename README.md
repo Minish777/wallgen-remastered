@@ -77,4 +77,4 @@ make clean     # убрать .venv и кэш
 
 ## Лицензия
 
-MIT
+GPL-3.0 — см. [LICENSE](LICENSE)

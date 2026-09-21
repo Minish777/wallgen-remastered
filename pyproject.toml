@@ -14,6 +14,8 @@ dependencies = [
     "lxml>=4.9",
 ]
 
+license = {text = "GPL-3.0-only"}
+
 [project.scripts]
 wallgen = "wallgen.cli:main"
 
