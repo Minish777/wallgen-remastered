@@ -32,21 +32,15 @@ python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 
 ## Примеры
 
-| Раскладка | Описание |
-|-----------|----------|
-| `tall` | Портретная (1080×2400), одна большая буква + акценты |
-| `moon`  | Портретная, полумесяц + кольцо + лист |
-| `duo`   | Портретная, две переплетённые буквы |
-| `layout2` | Горизонтальная (3840×2160), зеркальная композиция |
+<p align="center">
+  <img src="examples/tall.jpg" width="300"> &nbsp;&nbsp;
+  <img src="examples/landscape.jpg" width="300">
+</p>
 
-<p align="center">
-  <img src="examples/tall.jpg" width="340"> &nbsp;
-  <img src="examples/moon.jpg" width="340"> &nbsp;
-  <img src="examples/duo.jpg" width="340">
-</p>
-<p align="center">
-  <img src="examples/landscape.jpg" width="340">
-</p>
+| Раскладка | Формат | Описание |
+|-----------|--------|----------|
+| `tall` | 1080×2400 | Портретная, одна большая буква + акценты |
+| `layout2` | 3840×2160 | Горизонтальная, зеркальная композиция |
 
 ## Быстрый старт
 
