@@ -39,10 +39,14 @@ python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 | `duo`   | Портретная, две переплетённые буквы |
 | `layout2` | Горизонтальная (3840×2160), зеркальная композиция |
 
-![tall](examples/tall.jpg)
-![moon](examples/moon.jpg)
-![duo](examples/duo.jpg)
-![landscape](examples/landscape.jpg)
+<p align="center">
+  <img src="examples/tall.jpg" width="340"> &nbsp;
+  <img src="examples/moon.jpg" width="340"> &nbsp;
+  <img src="examples/duo.jpg" width="340">
+</p>
+<p align="center">
+  <img src="examples/landscape.jpg" width="340">
+</p>
 
 ## Быстрый старт
 
