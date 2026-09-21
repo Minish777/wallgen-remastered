@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wallgen"
+version = "0.1.0"
+description = "Material 3 wallpaper generator (Material You) in pure pycairo + numpy/PIL"
+requires-python = ">=3.10"
+dependencies = [
+    "pycairo>=1.21",
+    "Pillow>=9.0",
+    "numpy>=1.22",
+    "lxml>=4.9",
+]
+
+[project.scripts]
+wallgen = "wallgen.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["wallgen*"]
