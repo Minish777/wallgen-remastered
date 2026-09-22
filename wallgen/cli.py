@@ -19,7 +19,11 @@ from pathlib import Path
 from .layouts import LAYOUTS, get_layout, compose
 from .shapes import ranked_shapes
 
-__version__ = "0.1.0"
+try:
+    from importlib.metadata import version as _pkgver
+    __version__ = _pkgver("wallgen")
+except Exception:
+    __version__ = "0.3.0"
 from .palette import (
     STYLES,
     THEME_PRESETS,
@@ -236,7 +240,8 @@ def _out_path(args, theme, layout, mode, idx, seed) -> str:
 # ---------------------------------------------------------------------------
 
 def run_one(layout_name, theme, mode, out_path, seed, width, height, blur, rotate,
-            mirror, container, style, svg=None, verbose=False, solid=False, accent=None):
+            mirror, container, style, svg=None, verbose=False, solid=False, accent=None,
+            avoids=()):
     t0 = time.time()
     schemes = make_schemes(seed, mode, style)
     scheme = schemes["dark" if mode == "dark" else "light"]
@@ -247,7 +252,16 @@ def run_one(layout_name, theme, mode, out_path, seed, width, height, blur, rotat
         print("  " + scheme.summary())
 
     if layout_name == "auto":
-        layout = compose(portrait=height > width)
+        from .autofill import fingerprint
+        layout = None
+        for _ in range(16):
+            rng = random.Random()
+            cand = compose(portrait=height > width, rng=rng)
+            if not avoids or fingerprint(cand) not in avoids:
+                layout = cand
+                break
+        if layout is None:
+            layout = compose(portrait=height > width)
     else:
         layout = get_layout(layout_name)
     if container is not None:
@@ -334,6 +348,7 @@ def main(argv=None):
 
     idx = 0
     written: list[str] = []
+    avoids = set()
     for _ in range(args.count):
         for layout_name in layouts:
             if layout_name == "random":
@@ -389,9 +404,15 @@ def main(argv=None):
                 svg = None
                 if args.svg:
                     svg = args.svg.replace("{theme}", theme).replace("{layout}", layout_name)
+                avoids_now = tuple(avoids) if layout_name == "auto" else ()
                 run_one(layout_name, theme, mode, out_path, seed, width, height,
                         blur, rotate, mirror, container, style, svg=svg,
-                        verbose=args.verbose, solid=args.solid, accent=accent)
+                        verbose=args.verbose, solid=args.solid, accent=accent,
+                        avoids=avoids_now)
+                if layout_name == "auto":
+                    from .autofill import fingerprint
+                    fp = fingerprint(layout_obj)
+                    avoids.add(fp)
                 written.append(out_path)
                 explicit_target = bool(args.dir or _is_file_out(args))
                 if not explicit_target and not args.verbose:
@@ -401,7 +422,7 @@ def main(argv=None):
         pp = Path(written[0]).parent
         print(f"  wrote {len(written)} wallpapers into {pp}")
 
-    return written
+    return None
 
 
 if __name__ == "__main__":

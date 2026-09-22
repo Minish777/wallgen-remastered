@@ -101,6 +101,148 @@ def add_ring(cr, cx, cy, r, hole=0.66):
     cr.restore()
 
 
+def add_squircle(cr, cx, cy, r, n=4.6, steps=96, rot=0.0):
+    """M3's signature superellipse — a squircle (rounded square between a
+    circle and a square). |x|^n+|y|^n=r^n, rendered as a polygon with enough
+    segments to stay smooth."""
+    cr.save()
+    cr.translate(cx, cy)
+    cr.rotate(math.radians(rot))
+    cr.new_path()
+    first = True
+    for k in range(steps + 1):
+        t = 2 * math.pi * k / steps
+        x = r * math.copysign(abs(math.cos(t)) ** (2.0 / n), math.cos(t))
+        y = r * math.copysign(abs(math.sin(t)) ** (2.0 / n), math.sin(t))
+        if first:
+            cr.move_to(x, y)
+            first = False
+        else:
+            cr.line_to(x, y)
+    cr.close_path()
+    cr.restore()
+
+
+def add_hexagon(cr, cx, cy, r, rot=0.0):
+    """Regular rounded hexagon (pointy top), corners smoothed to an M3-style
+    radius. rot in degrees."""
+    cr.save()
+    cr.translate(cx, cy)
+    cr.rotate(math.radians(rot))
+    verts = [(r * math.cos(math.radians(a * 60.0 - 90.0)),
+              r * math.sin(math.radians(a * 60.0 - 90.0))) for a in range(6)]
+    _rounded_path(cr, verts, r * 0.22)
+    cr.restore()
+
+
+def _rounded_path(cr, verts, radius):
+    """Trace a closed path through `verts`, rounding every corner by `radius`."""
+    n = len(verts)
+    pts = [(float(x), float(y)) for x, y in verts]
+
+    def unit(a, b):
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L = math.hypot(dx, dy) or 1.0
+        return dx / L, dy / L
+
+    # entry point on each edge, inset `radius` from its far vertex
+    def edge_entry(i):
+        """Point on edge verts[i] -> verts[i+1] a radius before verts[i+1]."""
+        ux, uy = unit(pts[i], pts[(i + 1) % n])
+        return pts[(i + 1) % n][0] - ux * radius, pts[(i + 1) % n][1] - uy * radius
+
+    cr.new_path()
+    cr.move_to(*edge_entry(n - 1))
+    for i in range(n):
+        ni = (i + 1) % n
+        # arc rounding corner at verts[ni]
+        u = unit(pts[ni], pts[i])           # toward previous vertex
+        v = unit(pts[ni], pts[(ni + 1) % n])  # toward next vertex
+        s0 = (pts[ni][0] - u[0] * radius, pts[ni][1] - u[1] * radius)
+        cr.arc(pts[ni][0], pts[ni][1], radius,
+               math.atan2(u[1], u[0]), math.atan2(v[1], v[0]))
+        cr.line_to(*edge_entry(ni))
+    cr.close_path()
+
+
+def add_square(cr, cx, cy, r, rot=0.0):
+    """M3 card: rounded square inscribed in radius r (corner ~0.15r)."""
+    cr.save()
+    cr.translate(cx, cy)
+    cr.rotate(math.radians(rot))
+    s = r
+    _rounded_path(cr, [(-s, -s), (s, -s), (s, s), (-s, s)], r * 0.15)
+    cr.restore()
+
+
+def add_triangle(cr, cx, cy, r, rot=0.0):
+    """Rounded equilateral triangle pointing up (or rotated)."""
+    cr.save()
+    cr.translate(cx, cy)
+    cr.rotate(math.radians(rot))
+    _rounded_path(cr, [(0, -r), (math.sqrt(3) / 2 * r, 0.5 * r),
+                       (-math.sqrt(3) / 2 * r, 0.5 * r)], r * 0.18)
+    cr.restore()
+
+
+def add_pentagon(cr, cx, cy, r, rot=0.0):
+    """Rounded pentagon pointing up (or rotated)."""
+    cr.save()
+    cr.translate(cx, cy)
+    cr.rotate(math.radians(rot))
+    verts = [(r * math.cos(math.radians(a * 72.0 - 90.0)),
+              r * math.sin(math.radians(a * 72.0 - 90.0))) for a in range(5)]
+    _rounded_path(cr, verts, r * 0.18)
+    cr.restore()
+
+
+def add_diamond(cr, cx, cy, r, rot=0.0):
+    """Rounded lozenge (diamond) inscribed in radius r."""
+    cr.save()
+    cr.translate(cx, cy)
+    cr.rotate(math.radians(rot))
+    _rounded_path(cr, [(0, -r), (r, 0), (0, r), (-r, 0)], r * 0.16)
+    cr.restore()
+
+
+def add_arrow_down(cr, cx, cy, r, rot=0.0):
+    """Downward arrow: rounded shaft + arrow head."""
+    cr.save()
+    cr.translate(cx, cy)
+    cr.rotate(math.radians(rot))
+    _rounded_path(cr, [(-0.20 * r, -0.60 * r), (0.20 * r, -0.60 * r),
+                       (0.20 * r, 0.22 * r), (0.55 * r, 0.34 * r),
+                       (0.0, 0.95 * r), (-0.55 * r, 0.34 * r),
+                       (-0.20 * r, 0.22 * r)], r * 0.07)
+    cr.restore()
+
+
+def add_puffy(cr, cx, cy, r, rot=0.0):
+    """Soft blob: a hub circle merged with satellites (M3 'puffy cloud')."""
+    cr.save()
+    cr.translate(cx, cy)
+    for cx0, cy0, cr0 in ((0.0, 0.0, 0.62), (0.60, 0.0, 0.42), (-0.60, 0.0, 0.42),
+                          (0.0, 0.60, 0.42), (0.0, -0.60, 0.42)):
+        cr.arc(cx0 * r, cy0 * r, cr0 * r, 0, 2 * math.pi)
+    cr.restore()
+
+
+def add_softburst(cr, cx, cy, r, rot=0.0):
+    """Soft radial burst: centre disc + gently tapering rays."""
+    cr.save()
+    cr.translate(cx, cy)
+    cr.rotate(math.radians(rot))
+    cr.arc(0, 0, 0.55 * r, 0, 2 * math.pi)
+    for a in range(10):
+        a0 = math.radians(a * 36.0 - 9.0)
+        a1 = math.radians(a * 36.0 + 9.0)
+        cr.move_to(0.60 * r * math.cos(a0), 0.60 * r * math.sin(a0))
+        cr.arc(0, 0, 0.60 * r, a0, a1)
+        cr.arc(0, 0, r, a0, a1)
+        cr.close_path()
+    cr.restore()
+
+
 def add_crescent(cr, cx, cy, r, shift=0.62):
     """Moon: a disk carved by an offset disk; crescents open to the right.
     The carving disk is wound opposite (arc_negative) so non-zero fill gives
@@ -166,6 +308,20 @@ def add_letter(cr, letter: Letter, cx, cy, flip_x=False, flip_y=False, rot_deg=0
 _VOL_CACHE: Dict[Tuple, float] = {}
 
 
+# radius-driven primitive shapes shared by volume/rating (bbox = 2r, puffy 2.6r)
+_PRIMITIVES = {
+    "squircle": add_squircle,
+    "hexagon": add_hexagon,
+    "square": add_square,
+    "triangle": add_triangle,
+    "pentagon": add_pentagon,
+    "diamond": add_diamond,
+    "arrow": add_arrow_down,
+    "puffy": add_puffy,
+    "softburst": add_softburst,
+}
+
+
 def _draw(kind: str, key: Tuple):
     """Return a callable that traces kind's path centered at (0,0)."""
     if kind == "letter":
@@ -181,6 +337,11 @@ def _draw(kind: str, key: Tuple):
     if kind == "crescent":
         _, r, shift = key
         return lambda cr: add_crescent(cr, 0, 0, r, shift), 2 * r * (1 + shift)
+    if kind in _PRIMITIVES:
+        _, r = key
+        fn = _PRIMITIVES[kind]
+        size = 2.6 * r if kind == "puffy" else 2.0 * r
+        return lambda cr: fn(cr, 0, 0, r), size
     raise KeyError(kind)
 
 
@@ -229,6 +390,8 @@ def volume(item) -> float:
         key = ("leaf", item.w, item.h)
     elif k == "crescent":
         key = ("crescent", item.r, item.shift)
+    elif k in _PRIMITIVES:
+        key = (k, item.r)
     else:
         return 0.0
     if key not in _VOL_CACHE:
@@ -252,6 +415,15 @@ def ranked_shapes() -> list:
         ("круг", "circle", dict(r=232.3)),
         ("кольцо", "ring", dict(r=232.3)),
         ("полумесяц", "crescent", dict(r=232.3)),
+        ("squircle", "squircle", dict(r=232.3)),
+        ("шестиугольник", "hexagon", dict(r=232.3)),
+        ("квадрат", "square", dict(r=232.3)),
+        ("треугольник", "triangle", dict(r=232.3)),
+        ("пентагон", "pentagon", dict(r=232.3)),
+        ("ромб", "diamond", dict(r=232.3)),
+        ("стрелка", "arrow", dict(r=232.3)),
+        ("puffy", "puffy", dict(r=232.3)),
+        ("мягкая вспышка", "softburst", dict(r=232.3)),
     ):
         it = type("I", (), {"kind": kind, "w": kw.get("w", 0), "h": kw.get("h", 0),
                             "r": kw.get("r", 0), "hole": 0.66, "shift": 0.62})()

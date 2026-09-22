@@ -23,6 +23,7 @@ import numpy as np
 from .layouts import Item, Layout
 from .shapes import (
     add_arch, add_circle, add_crescent, add_leaf, add_letter, add_pill, add_ring, lib,
+    _PRIMITIVES,
 )
 
 DESIGN_W = 3840.0
@@ -47,6 +48,10 @@ def _natural(kind: str, **kw) -> Tuple[float, float]:
         return (kw.get("r", 232) * (1 + kw.get("shift", 0.62)) + kw.get("r", 232), 2 * kw.get("r", 232))
     if kind == "pill":
         return (kw.get("w", 640), kw.get("h", 240))
+    if kind in _PRIMITIVES:
+        r = kw.get("r", 232)
+        size = 2.6 * r if kind == "puffy" else 2.0 * r
+        return (size, size)
     return (2 * kw.get("r", 232), 2 * kw.get("r", 232))          # ring / circle
 
 
@@ -67,6 +72,8 @@ def _trace(cr, i: Item):
         add_arch(cr, i.x, i.y, i.w, i.h)
     elif i.kind == "leaf":
         add_leaf(cr, i.x, i.y, i.w, i.h)
+    elif i.kind in _PRIMITIVES:
+        _PRIMITIVES[i.kind](cr, i.x, i.y, i.r, rot=getattr(i, "rot", 0.0))
 
 
 def _mask(*items) -> np.ndarray:
@@ -101,7 +108,8 @@ def _tile(item) -> Tuple[np.ndarray, int, int]:
     key = (item.kind,
            (item.letter, item.layout, qs) if item.kind == "letter" else
            (round(item.w, 1), round(item.h, 1), round(item.r, 1),
-            round(getattr(item, "hole", 0.66), 3), round(getattr(item, "shift", 0.62), 3)))
+            round(getattr(item, "hole", 0.66), 3), round(getattr(item, "shift", 0.62), 3),
+            round(getattr(item, "rot", 0.0), 1)))
     if key in _TILE_CACHE:
         return _TILE_CACHE[key]
 
@@ -136,7 +144,8 @@ def _item_of(it) -> Item:
     """A placement-free copy respecting item.scale so caching is stable."""
     base = Item(it.kind, "", 0.0, 0.0,
                 w=getattr(it, "w", 0), h=getattr(it, "h", 0), r=getattr(it, "r", 0),
-                shift=getattr(it, "shift", 0.62), hole=getattr(it, "hole", 0.66))
+                shift=getattr(it, "shift", 0.62), hole=getattr(it, "hole", 0.66),
+                rot=getattr(it, "rot", 0.0))
     if it.kind == "letter":
         base = Item("letter", "", 0.0, 0.0, layout=it.layout, letter=it.letter)
         base.scale = it.scale if hasattr(it, "scale") else 1.0
@@ -173,6 +182,9 @@ def _stroke(item) -> float:
         (item.r * (1 + 0.62) + item.r) if item.kind == "crescent" else 2 * item.r)
     nh = attrs["h"] if item.kind in ("arch", "leaf", "pill") else (
         2 * item.r if item.kind == "crescent" else 2 * item.r)
+    if item.kind in _PRIMITIVES:
+        size = 2.6 * item.r if item.kind == "puffy" else 2.0 * item.r
+        nw = nh = size
     if item.kind == "letter":
         from .shapes import lib as _l
         let = _l().letter(item.letter, item.layout)
@@ -261,6 +273,22 @@ def _plot(occ: np.ndarray, item: Item) -> np.ndarray:
     return occ
 
 
+def fingerprint(layout) -> Tuple:
+    """Structural signature of a composition: kinds, roles, positions and
+    sizes of every item. Two layouts with the same fingerprint render the
+    same shape arrangement (differences smaller than rounding are ignored)."""
+    rows = []
+    for i in layout.items:
+        if i.kind == "letter":
+            sz = (i.letter, i.layout, round(getattr(i, "scale", 1.0) or 1.0, 2))
+        elif i.kind in ("arch", "leaf", "pill"):
+            sz = (round(i.w), round(i.h))
+        else:
+            sz = (round(i.r, 1), round(getattr(i, "rot", 0.0) or 0.0))
+        rows.append((i.kind, i.role, round(i.x), round(i.y), sz))
+    return tuple(sorted(rows))
+
+
 # ---------------------------------------------------------------------------
 # composition driver
 # ---------------------------------------------------------------------------
@@ -312,7 +340,8 @@ def build(portrait: bool = False, rng=None) -> Layout:
     for void in voids[:4]:
         cx = (void[1] + void[3]) / 2.0 * GRID
         cy = (void[0] + void[2]) / 2.0 * GRID
-        kind = rng.choice(["letter", "letter", "letter", "arch", "leaf", "ring", "crescent"])
+        kind = rng.choice(["letter", "letter", "letter", "arch", "leaf", "ring",
+                           "crescent", "squircle", "square", "diamond", "puffy"])
         role = rng.choice(["mid", "container2", "dark"])
         kw = {}
         if kind == "letter":
@@ -339,7 +368,9 @@ def build(portrait: bool = False, rng=None) -> Layout:
     pack_plan = []
     for m in mids:
         pack_plan.append(("letter", dict(layout="layout1", letter=m), 1.0))
-    for k in ("arch", "crescent", "ring", "leaf", "circle", "pill", "circle"):
+    for k in ("arch", "crescent", "ring", "leaf", "circle", "pill", "circle",
+              "square", "triangle", "pentagon", "diamond", "squircle",
+              "hexagon", "arrow", "puffy", "softburst", "circle"):
         pack_plan.append((k, {}, 1.0))
 
     x_lo, x_hi = (0.0, DESIGN_W)
@@ -359,6 +390,8 @@ def build(portrait: bool = False, rng=None) -> Layout:
             y = rng.uniform(320, DESIGN_H - 320)
             item = _sized(kind, s, **kw)
             item.role = rng.choice(["accent", "accent2", "light", "container2"])
+            if kind == "arrow":
+                item.rot = rng.choice([0, 90, 180, 270, 45, 135])
             if volume(item) > dom_vol * 0.6:
                 continue
             if not try_place(item, x, y):
