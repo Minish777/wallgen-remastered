@@ -23,7 +23,7 @@ try:
     from importlib.metadata import version as _pkgver
     __version__ = _pkgver("wallgen")
 except Exception:
-    __version__ = "0.3.0"
+    __version__ = "0.3.1"
 from .palette import (
     STYLES,
     THEME_PRESETS,

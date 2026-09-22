@@ -127,7 +127,6 @@ def _tile(item) -> Tuple[np.ndarray, int, int]:
     cr = cairo.Context(surf)
     cr.set_source_rgb(1, 1, 1)
     cr.paint()
-    cr.scale(1.0 / GRID, 1.0 / GRID)
     cr.translate(wc * GRID / 2.0, hc * GRID / 2.0)
     _trace(cr, base)
     cr.set_source_rgb(0, 0, 0)
@@ -152,18 +151,24 @@ def _item_of(it) -> Item:
     return base
 
 
-def _place_mask(occ: np.ndarray, item: Item) -> bool:
+def _place_mask(occ: np.ndarray, item: Item, pad: int = 0) -> bool:
     """Try to fold `item` into occ (zero collision); True if placed."""
     tile, row0, col0 = _tile(item)
     th, tw = tile.shape
     cy = int(round(item.y / GRID)) + row0
     cx = int(round(item.x / GRID)) + col0
-    if cy < 0 or cx < 0 or cy + th > GH or cx + tw > GW:
+    cy0, cx0 = cy - pad, cx - pad
+    cy1, cx1 = cy + th + pad, cx + tw + pad
+    if cy0 < 0 or cx0 < 0 or cy1 > GH or cx1 > GW:
         return False
-    window = occ[cy:cy + th, cx:cx + tw]
-    if int(np.logical_and(window, tile).sum()) > 0:
+    window = occ[cy0:cy1, cx0:cx1].copy()
+    interior = window[pad:pad + th, pad:pad + tw]
+    if int(np.logical_and(interior, tile).sum()) > 0:
         return False
-    window |= tile
+    window[pad:pad + th, pad:pad + tw] = False
+    if window.any() > 0:
+        return False
+    occ[cy:cy + th, cx:cx + tw] |= tile
     return True
 
 
@@ -313,16 +318,16 @@ def build(portrait: bool = False, rng=None) -> Layout:
     else:
         dominant = Item("letter", "deep", 1920.0, 1080.0, layout="layout1", letter=dom_letter)
         if portrait:
-            dominant.scale = 1.15 if dom_letter in ("n", "r", "j", "k") else 1.0
+            dominant.scale = 1.0 if dom_letter in ("n", "r", "j", "k") else 0.95
 
     items = [dominant]
     occ = np.zeros((GH, GW), bool)
     _place_mask(occ, dominant)
     dom_stroke = _stroke(dominant)
 
-    def try_place(item, x, y) -> bool:
+    def try_place(item, x, y, pad=0) -> bool:
         item.x, item.y = x, y
-        if not _place_mask(occ, item):
+        if not _place_mask(occ, item, pad):
             return False
         items.append(item)
         return True
@@ -365,12 +370,13 @@ def build(portrait: bool = False, rng=None) -> Layout:
     # 3) greedily pack mid + accent shapes into remaining open canvas
     mids = [k for k in LETTERS if k != dom_letter]
     rng.shuffle(mids)
-    pack_plan = []
-    for m in mids:
+    n_letters = rng.randint(2, 4)
+    m3_anchors = rng.sample(["squircle", "hexagon", "square", "pentagon", "diamond"], 2)
+    pack_plan = [(a, {}, 1.0) for a in m3_anchors]
+    for m in mids[:n_letters]:
         pack_plan.append(("letter", dict(layout="layout1", letter=m), 1.0))
     for k in ("arch", "crescent", "ring", "leaf", "circle", "pill", "circle",
-              "square", "triangle", "pentagon", "diamond", "squircle",
-              "hexagon", "arrow", "puffy", "softburst", "circle"):
+              "triangle", "arrow", "puffy", "softburst", "circle"):
         pack_plan.append((k, {}, 1.0))
 
     x_lo, x_hi = (0.0, DESIGN_W)
@@ -394,7 +400,7 @@ def build(portrait: bool = False, rng=None) -> Layout:
                 item.rot = rng.choice([0, 90, 180, 270, 45, 135])
             if volume(item) > dom_vol * 0.6:
                 continue
-            if not try_place(item, x, y):
+            if not try_place(item, x, y, pad=1):
                 continue
             placed = True
             break
