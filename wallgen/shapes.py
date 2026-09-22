@@ -239,7 +239,7 @@ def volume(item) -> float:
 def ranked_shapes() -> list:
     """All shape families ranked by occupied volume (design px^2), biggest first."""
     rows = []
-    for kind in ("boomerang", "n", "r", "j"):
+    for kind in ("w", "boomerang", "m", "n", "k", "r", "j"):
         it = type("I", (), {
             "kind": "letter", "layout": "layout1", "letter": kind,
             "w": 0, "h": 0, "r": 0, "hole": 0, "shift": 0,

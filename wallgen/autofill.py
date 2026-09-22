@@ -85,6 +85,79 @@ def _mask(*items) -> np.ndarray:
     return arr[:, :, 0] < 128
 
 
+_TILE_CACHE: Dict[Tuple, Tuple[np.ndarray, int, int]] = {}
+
+
+def _tile(item) -> Tuple[np.ndarray, int, int]:
+    """Cached local mask of `item` plus its design-space cell anchor.
+
+    Renders the shape once into a tight grid buffer centred on (0,0); placement
+    then shifts this tile by whole cells, so the packer never redraws a shape
+    mask per trial position.  The shape scale is quantised to GRID-sized steps
+    so repeated/neighbouring scales collapse onto the same cached tile. Returns
+    (tile, row0, col0) — top-left cell offset from the shape centre.
+    """
+    qs = round(getattr(item, "scale", 1.0) * (100.0 / GRID)) / (100.0 / GRID) if item.kind == "letter" else None
+    key = (item.kind,
+           (item.letter, item.layout, qs) if item.kind == "letter" else
+           (round(item.w, 1), round(item.h, 1), round(item.r, 1),
+            round(getattr(item, "hole", 0.66), 3), round(getattr(item, "shift", 0.62), 3)))
+    if key in _TILE_CACHE:
+        return _TILE_CACHE[key]
+
+    base = _item_of(item)
+    if item.kind == "letter":
+        base.scale = qs
+    nw, nh = _natural(item.kind, w=base.w, h=base.h, r=base.r, shift=base.shift,
+                      layout=base.layout, letter=base.letter)
+    sc = base.scale if base.kind == "letter" else 1.0
+    nw, nh = nw * sc, nh * sc
+    hc = max(int(np.ceil(min(nh, 3000) / GRID)) + 2, 3)
+    wc = max(int(np.ceil(min(nw, 3000) / GRID)) + 2, 3)
+
+    surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, wc * GRID, hc * GRID)
+    cr = cairo.Context(surf)
+    cr.set_source_rgb(1, 1, 1)
+    cr.paint()
+    cr.scale(1.0 / GRID, 1.0 / GRID)
+    cr.translate(wc * GRID / 2.0, hc * GRID / 2.0)
+    _trace(cr, base)
+    cr.set_source_rgb(0, 0, 0)
+    cr.fill()
+    arr = np.frombuffer(surf.get_data(), np.uint8).reshape(hc * GRID, wc * GRID, 4)
+    tile = arr[:, :, 0] < 128
+    tile = tile.reshape(hc, GRID, wc, GRID).any(3).any(1)
+
+    _TILE_CACHE[key] = (tile, -(hc // 2), -(wc // 2))
+    return _TILE_CACHE[key]
+
+
+def _item_of(it) -> Item:
+    """A placement-free copy respecting item.scale so caching is stable."""
+    base = Item(it.kind, "", 0.0, 0.0,
+                w=getattr(it, "w", 0), h=getattr(it, "h", 0), r=getattr(it, "r", 0),
+                shift=getattr(it, "shift", 0.62), hole=getattr(it, "hole", 0.66))
+    if it.kind == "letter":
+        base = Item("letter", "", 0.0, 0.0, layout=it.layout, letter=it.letter)
+        base.scale = it.scale if hasattr(it, "scale") else 1.0
+    return base
+
+
+def _place_mask(occ: np.ndarray, item: Item) -> bool:
+    """Try to fold `item` into occ (zero collision); True if placed."""
+    tile, row0, col0 = _tile(item)
+    th, tw = tile.shape
+    cy = int(round(item.y / GRID)) + row0
+    cx = int(round(item.x / GRID)) + col0
+    if cy < 0 or cx < 0 or cy + th > GH or cx + tw > GW:
+        return False
+    window = occ[cy:cy + th, cx:cx + tw]
+    if int(np.logical_and(window, tile).sum()) > 0:
+        return False
+    window |= tile
+    return True
+
+
 def _stroke(item) -> float:
     """Approximate stroke weight (кегль) in design px."""
     W = 360
@@ -183,16 +256,16 @@ def _sized(kind: str, scale: float, **kw) -> Item:
 
 
 def _plot(occ: np.ndarray, item: Item) -> np.ndarray:
-    """occ | ink(item) — new mask with the item added (origin-relative placement)."""
-    m = _mask(item)
-    return occ | m
+    """Return occ | item — via cached tile placement (origin-relative)."""
+    _place_mask(occ, item)
+    return occ
 
 
 # ---------------------------------------------------------------------------
 # composition driver
 # ---------------------------------------------------------------------------
 
-LETTERS = ("boomerang", "n", "r", "j")
+LETTERS = ("boomerang", "n", "r", "j", "m", "w", "k")
 ROLES_HIER = ("deep", "mid", "dark", "container2", "accent", "accent2", "light")
 
 
@@ -203,23 +276,25 @@ def build(portrait: bool = False, rng=None) -> Layout:
     rng = rng or random
 
     # 1) dominant: a big letter, or an oversized ring whose hollow gets filled.
-    dom_letter = rng.choice(["boomerang", "boomerang", "n"] if not portrait
-                            else ["n", "r", "j", "boomerang"])
+    if portrait:
+        dom_letter = rng.choice(["n", "n", "r", "j", "k", "boomerang"])
+    else:
+        dom_letter = rng.choice(["w", "boomerang", "boomerang", "m", "n", "k"])
     if rng.random() < 0.22 and not portrait:
         dominant = Item("ring", "deep", 1920.0, 1080.0, r=480.0)
     else:
         dominant = Item("letter", "deep", 1920.0, 1080.0, layout="layout1", letter=dom_letter)
         if portrait:
-            dominant.scale = 1.15 if dom_letter in ("n", "r", "j") else 1.0
+            dominant.scale = 1.15 if dom_letter in ("n", "r", "j", "k") else 1.0
 
     items = [dominant]
-    occ = _mask(*items)
+    occ = np.zeros((GH, GW), bool)
+    _place_mask(occ, dominant)
     dom_stroke = _stroke(dominant)
 
     def try_place(item, x, y) -> bool:
         item.x, item.y = x, y
-        own = _mask(item)
-        if int(np.logical_and(own, occ).sum()) > 0:
+        if not _place_mask(occ, item):
             return False
         items.append(item)
         return True
@@ -256,7 +331,6 @@ def build(portrait: bool = False, rng=None) -> Layout:
             continue
         for jx, jy in ((0, 0), (GRID * 0.6, 0), (-GRID * 0.6, 0), (0, GRID * 0.6), (0, -GRID * 0.6)):
             if try_place(item, cx + jx, cy + jy):
-                occ = _mask(*items)
                 break
 
     # 3) greedily pack mid + accent shapes into remaining open canvas
@@ -285,15 +359,10 @@ def build(portrait: bool = False, rng=None) -> Layout:
             y = rng.uniform(320, DESIGN_H - 320)
             item = _sized(kind, s, **kw)
             item.role = rng.choice(["accent", "accent2", "light", "container2"])
+            if volume(item) > dom_vol * 0.6:
+                continue
             if not try_place(item, x, y):
                 continue
-            try:
-                if volume(item) > dom_vol * 0.6:
-                    items.pop()
-                    continue
-            except Exception:
-                pass
-            occ = _mask(*items)
             placed = True
             break
 
@@ -308,7 +377,6 @@ def build(portrait: bool = False, rng=None) -> Layout:
             aitem.role = anchor_role
             for jx in (0, GRID * 2, -GRID * 2):
                 if try_place(aitem, 1920 + jx, ay):
-                    occ = _mask(*items)
                     break
 
     return Layout("auto", items, "panel", portrait)
