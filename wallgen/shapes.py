@@ -91,22 +91,24 @@ def add_circle(cr, cx, cy, r):
 
 
 def add_ring(cr, cx, cy, r, hole=0.66):
-    """Donut: two concentric circles, even-odd fill => a ring."""
+    """Donut: two concentric circles in one path; the inner one is wound the
+    opposite way (cairo.arc_negative) so non-zero fill carves the hole and no
+    special fill rule is required by the caller."""
     cr.save()
     cr.translate(cx, cy)
-    cr.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
     cr.arc(0, 0, r, 0, 2 * math.pi)
-    cr.arc(0, 0, r * hole, 0, 2 * math.pi)
+    cr.arc_negative(0, 0, r * hole, 2 * math.pi, 0)
     cr.restore()
 
 
 def add_crescent(cr, cx, cy, r, shift=0.62):
-    """Moon: a disk carved by an offset disk; crescents open to the right."""
+    """Moon: a disk carved by an offset disk; crescents open to the right.
+    The carving disk is wound opposite (arc_negative) so non-zero fill gives
+    the crescent without any fill-rule dependency on the caller."""
     cr.save()
     cr.translate(cx, cy)
-    cr.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)
     cr.arc(shift * r, 0, r, 0, 2 * math.pi)
-    cr.arc(-shift * r, 0, r * 0.92, 0, 2 * math.pi)
+    cr.arc_negative(-shift * r, 0, r * 0.92, 2 * math.pi, 0)
     cr.restore()
 
 
@@ -209,8 +211,10 @@ def volume(item) -> float:
     """Occupied area of an item silhouette in design-space px^2.
 
     Letters and the organic primitives (arch/leaf/crescent) are measured by
-    rasterising silhhouette; pills/circles/rings use exact formulas."""
+    rasterising silhhouette; pills/circles/rings use exact formulas. A
+    `scale` (SD letter only) scales the volume by scale**2."""
     k = item.kind
+    sc = (item.scale if getattr(item, "scale", None) else 1.0) if k == "letter" else 1.0
     if k == "pill":
         return max(0.0, item.w * item.h - 0.033 * min(item.w, item.h) ** 2)
     if k == "circle":
@@ -229,7 +233,7 @@ def volume(item) -> float:
         return 0.0
     if key not in _VOL_CACHE:
         _VOL_CACHE[key] = _measure_ink(k, key)
-    return _VOL_CACHE[key]
+    return _VOL_CACHE[key] * sc * sc
 
 
 def ranked_shapes() -> list:

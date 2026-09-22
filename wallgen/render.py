@@ -114,7 +114,8 @@ def _draw_all_items(cr, layout: Layout, scheme: Scheme, solid: bool = False):
         seen[i.role] = col
         if i.kind == "letter":
             add_letter(cr, lib().letter(i.letter, i.layout), i.x, i.y,
-                       flip_x=i.flip_x, flip_y=i.flip_y, rot_deg=i.rot)
+                       flip_x=i.flip_x, flip_y=i.flip_y, rot_deg=i.rot,
+                       scale=i.scale if hasattr(i, "scale") else 1.0)
         elif i.kind == "pill":
             add_pill(cr, i.x, i.y, i.w, i.h)
         elif i.kind == "circle":
@@ -131,9 +132,10 @@ def _draw_all_items(cr, layout: Layout, scheme: Scheme, solid: bool = False):
         cr.fill()
         if solid and i.kind == "letter":
             let = lib().letter(i.letter, i.layout)
-            add_letter(cr, let, i.x, i.y, flip_x=i.flip_x, flip_y=i.flip_y, rot_deg=i.rot)
+            sc = i.scale if hasattr(i, "scale") else 1.0
+            add_letter(cr, let, i.x, i.y, flip_x=i.flip_x, flip_y=i.flip_y, rot_deg=i.rot, scale=sc)
             cr.set_source_rgb(*hex_to_rgb01(col))
-            cr.set_line_width(min(let.w, let.h) * 0.34)
+            cr.set_line_width(min(let.w, let.h) * 0.34 * sc)
             cr.set_line_join(cairo.LINE_JOIN_ROUND)
             cr.set_line_cap(cairo.LINE_CAP_ROUND)
             cr.stroke()
@@ -165,7 +167,8 @@ def _stroke_items(cr, layout: Layout):
     for i in layout.items:
         if i.kind == "letter":
             add_letter(cr, lib().letter(i.letter, i.layout), i.x, i.y,
-                       flip_x=i.flip_x, flip_y=i.flip_y, rot_deg=i.rot)
+                       flip_x=i.flip_x, flip_y=i.flip_y, rot_deg=i.rot,
+                       scale=i.scale if hasattr(i, "scale") else 1.0)
         elif i.kind == "pill":
             add_pill(cr, i.x, i.y, i.w, i.h)
         elif i.kind == "circle":

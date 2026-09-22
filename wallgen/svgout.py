@@ -73,10 +73,11 @@ def _rect_d(x0, y0, x1, y1, r):
 def _letter_d(letter, i) -> str:
     a = math.radians(i.rot)
     ca, sa = math.cos(a), math.sin(a)
+    sc = i.scale if hasattr(i, "scale") else 1.0
     fx = -1.0 if i.flip_x else 1.0
     fy = -1.0 if i.flip_y else 1.0
-    m00, m01 = fx * ca, -sa
-    m10, m11 = sa, fy * ca
+    m00, m01 = fx * sc * ca, -sc * sa
+    m10, m11 = sc * sa, fy * sc * ca
     tx, ty = i.x, i.y
     out = []
     for op, *aa in letter.path.cmds:

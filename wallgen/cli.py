@@ -163,7 +163,7 @@ description="Генератор обоев в стиле Material You (M3).\n"
                     "Темы:    wallgen --list-themes\n"
                     "Стили:   wallgen --list-styles\n"
                     "Раскладки: %s\n"
-                    "Авто:    wallgen -L auto — собирает композицию по объёму фигур"
+                    "Авто:    wallgen -L auto — растеризует доминанту, заполняет её пустоты и заселяет канву по объёму"
                      % ", ".join(f"{n}{'*' if l.portrait else ''}"
                                  for n, l in LAYOUTS.items()),
          epilog="Примеры:\n"

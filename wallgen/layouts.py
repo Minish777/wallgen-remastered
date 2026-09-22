@@ -29,6 +29,7 @@ class Item:
     rot: float = 0.0
     hole: float = 0.66   # ring: inner radius as a fraction of r
     shift: float = 0.62  # crescent: disk offset as a fraction of r
+    scale: float = 1.0   # letters only: uniform scale relative to natural size
 
 
 @dataclass
@@ -233,60 +234,12 @@ _L("moon", "panel", [
 def compose(portrait: bool = False, rng=None) -> Layout:
     """Build a balanced composition from shapes ranked by occupied volume.
 
-    Построение «всегда хорошей» композиции:
-      * доминанта   — самая большая буква (бумеранг / n),
-      * средняя     — меньшая буква (r / j),
-      * акценты     — маленькие фигуры (полумесяц/круг/кольцо/лист),
-    чтобы силуэты всегда убывали по объёму и иерархия не ломалась.
+    Delegate to the void-aware engine (autofill.build) which rasterises the
+    dominant, fills its enclosed voids and greedily packs the canvas so every
+    result is structurally sound and truly randomised.
     """
-    from .shapes import volume
-
-    rng = rng or random
-
-    def V(k, **kw):
-        return volume(Item(k, "", 0.0, 0.0, **kw))
-
-    letters = ["boomerang", "n", "r", "j"]
-    vols = {k: V("letter", layout="layout1", letter=k) for k in letters}
-    dominant = rng.choice(["boomerang", "boomerang", "n"]) if not portrait \
-        else rng.choice(["n", "boomerang"])
-    mids = [k for k in letters if k not in (dominant,) and vols[k] < vols[dominant] * 0.92]
-    mid = rng.choice(mids or ["r"])
-
-    accent_kinds = ["circle", "crescent", "ring", "leaf"]
-    fillers = []
-    for _ in range(2):
-        k = rng.choice(accent_kinds)
-        if k == "circle":
-            fillers.append(lambda x, y, role, rng=rng: Item("circle", role, x, y, r=205 + rng.randint(0, 40)))
-        elif k == "crescent":
-            fillers.append(lambda x, y, role, rng=rng: Item("crescent", role, x, y, r=205 + rng.randint(0, 40), rot=rng.choice([-40, -20, 0, 20, 40])))
-        elif k == "ring":
-            fillers.append(lambda x, y, role, rng=rng: Item("ring", role, x, y, r=180 + rng.randint(0, 40)))
-        else:
-            fillers.append(lambda x, y, role, rng=rng: Item("leaf", role, x, y, w=460 + rng.randint(0, 80), h=300 + rng.randint(0, 80), rot=rng.choice([-25, -10, 0, 10, 25])))
-
-    if portrait:
-        jr = rng.choice([-1, 1])   # акценты слева/справа от колонки
-        items = [
-            Item("letter", "deep", 1920.0, 1140.0, layout="layout1", letter=dominant),
-            Item("letter", "mid", 1920.0, 690.0, layout="layout1", letter=mid),
-            fillers[0](1920.0 + jr * 330, 480.0, "accent"),
-            fillers[1](1920.0 - jr * 330, 1560.0, "light"),
-            Item("pill", "container2", 1920.0, 350.0, w=780.0, h=180.0),
-            Item("pill", "dark", 1920.0, 1800.0, w=780.0, h=180.0),
-        ]
-    else:
-        items = [
-            Item("letter", "deep", 1150.0, 1160.0, layout="layout1", letter=dominant),
-            Item("letter", "mid", 2940.0, 1090.0, layout="layout1", letter=mid),
-            Item("arch", "container2", 2560.0, 520.0, w=520.0, h=760.0),
-            fillers[0](730.0, 600.0, "accent"),
-            fillers[1](2910.0, 1680.0, "light"),
-            Item("pill", "container2", 1500.0, 1780.0, w=620.0, h=200.0),
-            Item("circle", "dark", 2270.0, 1480.0),
-        ]
-    return Layout("auto", items, "panel", portrait)
+    from .autofill import build as _auto_build
+    return _auto_build(portrait=portrait, rng=rng)
 
 
 def get_layout(name: str) -> Layout:
