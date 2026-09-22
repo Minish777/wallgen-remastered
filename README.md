@@ -19,7 +19,7 @@ python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 **Через pipx** (изолированно, без вмешательства в системный Python):
 
 ```bash
-pipx install https://github.com/Minish777/wallgen-remastered/releases/latest/download/wallgen-0.3.1-py3-none-any.whl
+pipx install "https://github.com/Minish777/wallgen-remastered/releases/download/v0.3.1/wallgen-0.3.1-py3-none-any.whl"
 # или из локальной сборки:
 python3 -m build && pipx install ./dist/wallgen-0.3.1-py3-none-any.whl
 ```
